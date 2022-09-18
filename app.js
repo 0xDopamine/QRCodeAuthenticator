@@ -117,6 +117,6 @@ app.post("/qr/generate", async (req, res) => {
 		console.log(err);
 	}
 });
-
+ 
 
 module.exports = app;
