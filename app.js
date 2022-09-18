@@ -1,36 +1,14 @@
 require("dotenv").config();
 require("./config/database").connect();
-const ejs = require("ejs");
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const qrcode = require("qrcode");
 const User = require("./model/user");
-const passport = require("passport"),
-const bodyParser = require("body-parser"),
-const LocalStrategy = require("passport-local"),
-const passportLocalMongoose = require("passport-local-mongoose");
 const { default: mongoose } = require("mongoose");
-mongoose.set('userNewUrlParser', true);
-mongoose.set('useFindAndModify', false);
-mongoose.set('userCreateIndex', true);
-mongoose.set('useUnifiedTopology', true);
-mongoose.connect("mongodb://localhost/auth_demo_app");
 
 const app = express();
-
-app.set("view engine", "ejs");
 app.use(express.json());
-app.get("/register", (req, res) => {
-	res.render('register', {
-	title: 'Registration Page',
-	first_name: '',
-	last_name: '',
-	email: '',
-	password: ''    
-	})
-	res.json()
-});
 
 app.post("/register", async (req, res) => {
 	
@@ -71,8 +49,33 @@ app.post("/register", async (req, res) => {
 	}
 });
 
-app.post("/login", (req, res) => {
-	//login logic here
+app.post("/login", async (req, res) => {
+	
+	try {
+		const { email, password } = req.body;
+
+		if (!(email && password)) {
+			res.status(400).send("Fill the required inputs");
+		}
+
+		const user = await User.findOne({ email });
+
+		if (user && (await bcrypt.compare(password, user.password))) {
+			const token = jwt.sign(
+				{ user_id: user._id, email },
+				process.env.TOKEN_KEY,
+				{
+					expiresIn: "2h",
+				}
+			);
+			
+			user.token = token;	
+			return res.status(200).json({ token });
+		}
+		return res.status(400).send("User not found!");
+	} catch (err) {
+		console.log(err);
+	}
 });
 
 
