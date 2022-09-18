@@ -3,9 +3,10 @@ require("./config/database").connect();
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const qrcode = require("qrcode");
+const QR = require("qrcode");
 const User = require("./model/user");
 const { default: mongoose } = require("mongoose");
+const QRCode = require("./model/qrCode");
 
 const app = express();
 app.use(express.json());
@@ -78,6 +79,44 @@ app.post("/login", async (req, res) => {
 	}
 });
 
+app.post("/qr/generate", async (req, res) => {
+	try {
+		const { userId } = req.body;
+
+		if (!userId) {
+			res.status(400).send("User Id is required");
+		}
+		const user = await User.findById(userId);
+
+		if (!user) {
+			res.status(400).send("User not found");
+		}
+
+		const qrExist = await QRCode.findOne({ userId });
+
+		if (!qrExist) {
+			await QRCode.create({ userId });
+		}
+		else {
+			await QRCode.findOneAndUpdate( { userId }, {$set: { disabled: true }});
+			await QRCode.create({ userId });
+		}
+
+		const encryptedData = jwt.sign(
+			{ userId: user._id },
+			process.env.TOKEN_KEY,
+			{
+				expiresIn: "1d",
+			}
+		);
+
+		const dataImage = await QR.toDataURL(encryptedData);
+
+		return res.status(200).json({ dataImage });
+	} catch (err) {
+		console.log(err);
+	}
+});
 
 
 module.exports = app;
