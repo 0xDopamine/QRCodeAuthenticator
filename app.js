@@ -118,5 +118,57 @@ app.post("/qr/generate", async (req, res) => {
 	}
 });
  
+app.post("/qr/scan", async (req, res) => {
+	try {
+		const { token, deviceInformation } = req.body;
+
+		if (!token && !deviceInformation) {
+			res.status(400).send("Token and deviceInformation are required");
+		}
+
+		const decoded = jwt.verify(token, process.env.TOKEN_KEY);
+
+		const qrCode = await QRCode.findOne({
+			userId: decoded.userId,
+			qrCodeId: decoded._id,
+			disabled: false,
+		});
+
+		if (!qrCode) {
+			res.status(400).send("QRCode not found!");
+		}
+
+		const connectedDeviceData = {
+			userId: decoded.userId,
+			qrCodeId: qrCodeId,
+			deviceName: deviceInformation.deviceName,
+			deviceModel: deviceInformation.deviceModel,
+			deviceOS: deviceInformation.deviceOS,
+			deviceVersion: deviceInformation.deviceVersion,
+		};
+
+		const connectedDevice = await connectedDevice.create(connectedDeviceData);
+
+		await QRCode.findOneAndUpdate(
+			{ _id: qrCode._id },
+			{
+				isActive: true,
+				connectedDeviceId: connectedDevice._id,
+				lastUsedDate: new Date(),
+			}
+		);
+
+		const user = await User.findById(decoded.userId);
+
+		const authToken = jwt.sign({ user_id: user._id }, process.env.TOKEN_KEY, {
+			expiresIn: "2h",
+		});
+
+		return res.status(200).json({ token: authToken });
+	} catch (err) {
+		console.log(err);
+	}
+});
+
 
 module.exports = app;
