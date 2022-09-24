@@ -1,5 +1,6 @@
 require("dotenv").config();
 require("./config/database").connect();
+
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -7,8 +8,9 @@ const QR = require("qrcode");
 const User = require("./model/user");
 const { default: mongoose } = require("mongoose");
 const QRCode = require("./model/qrCode");
-
+const ConnectedDevice = require("./model/connectedDevice");
 const app = express();
+
 app.use(express.json());
 
 app.post("/register", async (req, res) => {
@@ -123,14 +125,13 @@ app.post("/qr/scan", async (req, res) => {
 		const { token, deviceInformation } = req.body;
 
 		if (!token && !deviceInformation) {
-			res.status(400).send("Token and deviceInformation are required");
+			res.status(400).send("Token and device information are required!");
 		}
 
 		const decoded = jwt.verify(token, process.env.TOKEN_KEY);
 
 		const qrCode = await QRCode.findOne({
 			userId: decoded.userId,
-			qrCodeId: decoded._id,
 			disabled: false,
 		});
 
@@ -140,14 +141,14 @@ app.post("/qr/scan", async (req, res) => {
 
 		const connectedDeviceData = {
 			userId: decoded.userId,
-			qrCodeId: qrCodeId,
+			qrCodeId: qrCode._id,
 			deviceName: deviceInformation.deviceName,
 			deviceModel: deviceInformation.deviceModel,
 			deviceOS: deviceInformation.deviceOS,
 			deviceVersion: deviceInformation.deviceVersion,
 		};
 
-		const connectedDevice = await connectedDevice.create(connectedDeviceData);
+		const connectedDevice = await ConnectedDevice.create(connectedDeviceData);
 
 		await QRCode.findOneAndUpdate(
 			{ _id: qrCode._id },
@@ -163,7 +164,7 @@ app.post("/qr/scan", async (req, res) => {
 		const authToken = jwt.sign({ user_id: user._id }, process.env.TOKEN_KEY, {
 			expiresIn: "2h",
 		});
-
+		console.log("Successfully logged in!");
 		return res.status(200).json({ token: authToken });
 	} catch (err) {
 		console.log(err);
